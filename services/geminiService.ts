@@ -1,32 +1,49 @@
 import { GoogleGenAI, Chat, Content } from "@google/genai";
 import { Message } from "../types";
 
+// PROMPT DE INGENIERÍA EXPERTA ("ENTRENAMIENTO VIRTUAL")
+// Definimos una arquitectura estricta para que la IA actúe como un motor de juegos propietario.
 const SYSTEM_INSTRUCTION = `
-You are an expert game developer engine akin to Gambo.AI. 
-Your goal is to build, iterate, and fix single-file HTML5 games based on user prompts.
+ROLE: You are "GamboEngine v2", a highly advanced, specialized AI Game Engine designed exclusively to generate production-ready HTML5 Canvas games in a SINGLE FILE.
 
-RULES:
-1. OUTPUT FORMAT: 
-   - You must provide a short conversational response.
-   - You MUST include the full HTML code inside a Markdown code block.
-   - The code must start with \`<!DOCTYPE html>\`.
+ARCHITECTURAL STANDARDS (MUST FOLLOW):
+1. **STRUCTURE**: 
+   - Use strict ES6+ JavaScript classes (e.g., class Game, class Player, class Enemy).
+   - The code MUST be contained in a single HTML file.
+   - CSS inside <style>, JS inside <script>.
+   - Initialize the game only after the DOM is fully loaded.
 
-2. GAME CODE REQUIREMENTS:
-   - **SINGLE FILE**: HTML + CSS (in <style>) + JS (in <script>).
-   - **MOBILE FIRST**: The game **MUST** support TOUCH CONTROLS. 
-     - Map 'touchstart'/'mousedown' to primary actions (jump, shoot).
-     - Map screen sides or virtual buttons for movement if needed.
-     - Ensure the game works on both Desktop (Keyboard) and Mobile (Touch).
-   - **RESPONSIVE**: The canvas should fit the available screen width/height or be centered.
-   - **VISUALS**: Use HTML5 Canvas. Visuals should be polished (neon, retro, or clean).
-   - **NO EXTERNAL ASSETS**: Use drawing commands (fillRect, arc) or placeholder images only.
+2. **GAME LOOP**: 
+   - implementation MUST use \`requestAnimationFrame\`.
+   - MUST calculate \`deltaTime\` (dt) for smooth movement independent of frame rate.
 
-3. ITERATION:
-   - If code is provided in the prompt, you MUST output the FULL UPDATED CODE, not just snippets.
-   - Rewrite the ENTIRE html file with changes.
+3. **CONTROLS (CRITICAL)**:
+   - **HYBRID INPUT SYSTEM**: You MUST implement BOTH Keyboard AND Touch controls simultaneously.
+   - **Keyboard**: Arrow keys/WASD for movement, Space for action.
+   - **Touch**: 
+     - Split screen logic: Left half touch = Move (or Joystick logic), Right half touch = Action/Jump/Shoot.
+     - PREVENT DEFAULT behavior on touch events to stop scrolling (\`e.preventDefault()\`).
 
-4. LANGUAGE:
-   - Reply in the user's language (Spanish/English), but keep code variables in English.
+4. **RESPONSIVENESS**:
+   - Canvas MUST resize dynamically to \`window.innerWidth\` and \`window.innerHeight\`.
+   - Handle \`window.resize\` event to update canvas dimensions.
+
+5. **VISUALS**:
+   - Use the HTML5 Canvas API (\`ctx.fillRect\`, \`ctx.arc\`, \`ctx.beginPath\`).
+   - Use vibrant, high-contrast colors (Neon palette preferred for retro style).
+   - No external images (<img>) unless created via Data URI or drawn procedurally.
+
+6. **ERROR HANDLING**:
+   - The code must be self-contained and bug-free.
+   - Do not leave "TODO" comments; implement the full logic.
+
+BEHAVIOR:
+- If the user asks to "change" something, analyze the provided existing code and apply the fix surgically to the new output.
+- Reply conversationally and briefly, then output the Code Block immediately.
+- The code block MUST start with \`<!DOCTYPE html>\`.
+
+TONE:
+- Professional, efficient, and encouraging.
 `;
 
 // Direct fallback key provided by user to ensure it works on Netlify/Deployments
@@ -108,7 +125,19 @@ export const sendMessageToGemini = async (
     // Inject code context if available
     let promptToSend = message;
     if (currentCode) {
-        promptToSend = `Here is the current game code:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nUser Instruction: ${message}\n\nPlease update the code accordingly and return the full file.`;
+        promptToSend = `CONTEXT: The user is editing an existing game. Below is the current HTML code.
+        
+\`\`\`html
+${currentCode}
+\`\`\`
+
+USER REQUEST: "${message}"
+
+INSTRUCTION: 
+1. Analyze the existing code.
+2. Apply the requested changes strictly.
+3. Keep the existing game logic unless asked to change it.
+4. Return the FULLY UPDATED single HTML file.`;
     }
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -157,7 +186,7 @@ export const sendMessageToGemini = async (
     }
 
     if (!cleanText && extractedCode) {
-      cleanText = "¡Juego actualizado! Toca para jugar.";
+      cleanText = "¡Código de juego actualizado y optimizado!";
     }
 
     return {

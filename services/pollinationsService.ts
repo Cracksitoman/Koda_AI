@@ -1,15 +1,18 @@
 import { Message } from "../types";
 
-// Much simpler prompt to avoid "reasoning" output
+// PROMPT DE "ENTRENAMIENTO" SIMPLIFICADO PARA MODELOS MÁS PEQUEÑOS
 const SYSTEM_INSTRUCTION = `
-You are a coding engine. Write a SINGLE-FILE HTML5 game.
-RULES:
-1. NO text explanations. NO planning.
-2. START DIRECTLY with \`\`\`html.
-3. INCLUDE CSS in <style> and JS in <script>.
-4. MUST support TOUCH (touchstart) for mobile.
-5. Use <canvas> for graphics.
-6. If code is provided, UPDATE it based on the user request.
+You are an HTML5 Game Generator Bot.
+YOUR GOAL: Create valid, playable, single-file HTML5 games.
+
+STRICT RULES:
+1. OUTPUT: Start immediately with \`\`\`html. Do not chat.
+2. FILE: Combine HTML, CSS (in <style>), and JS (in <script>).
+3. MOBILE: You MUST implement 'touchstart' and 'touchend' listeners.
+   - Map Left-side touch -> Move.
+   - Map Right-side touch -> Action.
+4. GAME LOOP: Use requestAnimationFrame.
+5. CANVAS: Set canvas.width = window.innerWidth.
 `;
 
 export const sendMessageToPollinations = async (
@@ -33,9 +36,9 @@ export const sendMessageToPollinations = async (
     // This ensures the AI edits the existing file instead of creating a new one.
     let userPrompt = message;
     if (currentCode) {
-        userPrompt = `Here is the current existing code:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nUSER REQUEST: ${message}\n\nTask: Return the fully updated code.`;
+        userPrompt = `PREVIOUS CODE (Modify this):\n\`\`\`html\n${currentCode}\n\`\`\`\n\nREQUEST: ${message}\n\nTask: Return FULL updated code only.`;
     } else {
-        userPrompt = `Create code for: ${message}`;
+        userPrompt = `Create a game: ${message}`;
     }
 
     messages.push({ role: 'user', content: userPrompt });
