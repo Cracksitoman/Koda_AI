@@ -4,7 +4,7 @@ import GamePreview from './components/GamePreview';
 import CodeViewer from './components/CodeViewer';
 import { sendMessageToGemini, resetChat } from './services/geminiService';
 import { sendMessageToPollinations } from './services/pollinationsService';
-import { getSessions, saveSession, createSession, deleteSession } from './services/storageService';
+import { getSessions, saveSession, createSession, deleteSession, clearAllData } from './services/storageService';
 import { exportGameAsHtml } from './services/exportService';
 import { Message, GameState, ViewMode, ChatSession, AIModel } from './types';
 import { PlayIcon, CodeIcon, ChatIcon, DownloadIcon } from './components/Icons';
@@ -56,8 +56,12 @@ const App: React.FC = () => {
     setCurrentSessionId(session.id);
     setMessages(session.messages);
     setCurrentModel(session.model || 'gemini'); // Restore model choice if saved
+    
+    // Safety check: ensure code is actually HTML before loading it
+    const validCode = (session.code && session.code.includes("<!DOCTYPE html>")) ? session.code : null;
+
     setGameState({
-      code: session.code,
+      code: validCode,
       version: session.version,
       isLoading: false,
       error: null
@@ -65,6 +69,14 @@ const App: React.FC = () => {
     // Reset Gemini context for the new session so it learns from the loaded messages
     resetChat();
   }, []);
+
+  const handleResetAll = () => {
+    clearAllData();
+    setSessions([]);
+    setMessages([]);
+    setGameState({ code: null, version: 0, isLoading: false, error: null });
+    createNewSession();
+  };
 
   const handleDeleteSession = (id: string) => {
     deleteSession(id);
@@ -215,6 +227,7 @@ const App: React.FC = () => {
           onSelectSession={loadSession}
           onDeleteSession={handleDeleteSession}
           onExport={handleExport}
+          onResetAll={handleResetAll}
         />
       </div>
 
@@ -296,6 +309,7 @@ const App: React.FC = () => {
               onSelectSession={loadSession}
               onDeleteSession={handleDeleteSession}
               onExport={handleExport}
+              onResetAll={handleResetAll}
             />
         </div>
 

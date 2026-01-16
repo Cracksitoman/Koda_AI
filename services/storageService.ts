@@ -57,3 +57,7 @@ export const updateSessionName = (id: string, name: string) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
   }
 };
+
+export const clearAllData = () => {
+  localStorage.removeItem(STORAGE_KEY);
+};

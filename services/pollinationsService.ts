@@ -1,36 +1,26 @@
 import { Message } from "../types";
 
 const SYSTEM_INSTRUCTION = `
-You are an expert game developer engine akin to Gambo.AI. 
-Your goal is to build, iterate, and fix single-file HTML5 games based on user prompts.
+Role: Expert HTML5 Game Developer.
+Task: Create single-file HTML5 games.
 
-RULES:
-1. OUTPUT FORMAT: 
-   - You must provide a short conversational response.
-   - You MUST include the full HTML code inside a Markdown code block (e.g., \`\`\`html ... \`\`\`).
-   - The code must start with \`<!DOCTYPE html>\`.
-   - IMPORTANT: Return the raw text response. Do not wrap it in a JSON object.
+STRICT OUTPUT RULES:
+1. DO NOT output internal reasoning or "We need to...".
+2. DO NOT output "Here is the code".
+3. DIRECTLY output the explanation followed by the code block.
+4. The code MUST be inside a markdown block: \`\`\`html ... \`\`\`.
+5. The code MUST start with \`<!DOCTYPE html>\`.
 
-2. GAME CODE REQUIREMENTS:
-   - **SINGLE FILE**: HTML + CSS (in <style>) + JS (in <script>).
-   - **MOBILE FIRST**: The game **MUST** support TOUCH CONTROLS. 
-     - Map 'touchstart'/'mousedown' to primary actions (jump, shoot).
-     - Map screen sides or virtual buttons for movement if needed.
-     - Ensure the game works on both Desktop (Keyboard) and Mobile (Touch).
-   - **RESPONSIVE**: The canvas should fit the available screen width/height or be centered.
-   - **VISUALS**: Use HTML5 Canvas. Visuals should be polished (neon, retro, or clean).
-   - **NO EXTERNAL ASSETS**: Use drawing commands (fillRect, arc) or placeholder images only.
-
-3. ITERATION:
-   - If the user asks to modify the game, rewrite the ENTIRE html file with changes.
-
-4. LANGUAGE:
-   - Reply in the user's language (Spanish/English), but keep code variables in English.
+GAME REQUIREMENTS:
+- Single HTML file (CSS/JS embedded).
+- Mobile-friendly (Touch controls are MANDATORY).
+- Use HTML5 Canvas.
+- No external assets.
 `;
 
 export const sendMessageToPollinations = async (message: string, previousMessages: Message[] = []): Promise<{ text: string; code: string | null }> => {
   try {
-    // Construct the message history for Pollinations (OpenAI format)
+    // Construct the message history
     const messages = [
       { role: 'system', content: SYSTEM_INSTRUCTION },
       ...previousMessages.map(msg => ({
@@ -47,7 +37,7 @@ export const sendMessageToPollinations = async (message: string, previousMessage
       },
       body: JSON.stringify({
         messages: messages,
-        model: 'openai', // Maps to GPT-4o-mini or similar
+        model: 'openai', 
         seed: Math.floor(Math.random() * 1000),
         jsonMode: false
       }),
@@ -59,42 +49,24 @@ export const sendMessageToPollinations = async (message: string, previousMessage
 
     let responseText = await response.text();
 
-    // --- JSON PARSING FIX ---
-    // Sometimes Pollinations (or the underlying model like DeepSeek) returns a JSON object
-    // instead of raw text. We need to unwrap it.
+    // 1. Clean JSON if present
     try {
       const trimmed = responseText.trim();
       if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
         const json = JSON.parse(trimmed);
-        
-        // Priority 1: Standard 'content' field
-        if (json.content) {
-          responseText = json.content;
-        } 
-        // Priority 2: OpenAI 'choices' format
-        else if (json.choices?.[0]?.message?.content) {
-          responseText = json.choices[0].message.content;
-        }
-        // Priority 3: DeepSeek 'reasoning_content' without content (Edge case)
-        // If we only have reasoning, the model failed to produce the final output.
-        else if (json.reasoning_content) {
-             console.warn("Pollinations returned reasoning but no content.");
-             // Fallback: If the code happened to be in the reasoning (unlikely but possible)
-             responseText = json.reasoning_content; 
-        }
+        if (json.content) responseText = json.content;
+        else if (json.choices?.[0]?.message?.content) responseText = json.choices[0].message.content;
       }
-    } catch (e) {
-      // Not JSON, ignore and use raw text
-    }
+    } catch (e) { /* Ignore */ }
 
-    // Remove <think> tags if present (DeepSeek artifacts)
+    // 2. Remove DeepSeek <think> tags
     responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-    // --- Code Extraction Logic ---
+    // 3. Extract Code
     let extractedCode = null;
     let cleanText = responseText;
 
-    // Strategy 1: Look for Markdown code blocks
+    // Regex for markdown code block
     const codeBlockRegex = /```(?:html|xml)?\s*([\s\S]*?)```/i;
     const match = responseText.match(codeBlockRegex);
 
@@ -102,28 +74,35 @@ export const sendMessageToPollinations = async (message: string, previousMessage
       extractedCode = match[1].trim();
       cleanText = responseText.replace(match[0], '').trim();
     } else {
-      // Strategy 2: Fallback - Look for raw HTML structure
-      const htmlRegex = /<!DOCTYPE html>[\s\S]*<\/html>/i;
-      const htmlMatch = responseText.match(htmlRegex);
-      if (htmlMatch) {
-        extractedCode = htmlMatch[0].trim();
-        cleanText = responseText.replace(htmlMatch[0], '').trim();
+      // Fallback: Find raw HTML
+      const startIdx = responseText.indexOf("<!DOCTYPE html>");
+      const endIdx = responseText.lastIndexOf("</html>");
+      
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        extractedCode = responseText.substring(startIdx, endIdx + 7);
+        cleanText = responseText.substring(0, startIdx).trim();
       }
     }
 
-    if (!cleanText && extractedCode) {
-      cleanText = "¡Juego generado con Pollinations! Toca para jugar.";
+    // 4. Validation: If we didn't find valid HTML, return null for code
+    if (extractedCode && !extractedCode.includes("<!DOCTYPE html>")) {
+      extractedCode = null;
     }
 
-    // Final fallback if extraction failed but we suspect code is there
-    if (!extractedCode && responseText.includes("<!DOCTYPE html>")) {
-        // Try one more aggressive grab
-        const startIndex = responseText.indexOf("<!DOCTYPE html>");
-        const endIndex = responseText.lastIndexOf("</html>");
-        if (endIndex > startIndex) {
-            extractedCode = responseText.substring(startIndex, endIndex + 7);
-            cleanText = "Código extraído manualmente.";
-        }
+    // 5. Cleanup "Reasoning" text from the message if code was found
+    // Sometimes the model puts the reasoning in the "cleanText" part.
+    if (extractedCode) {
+      if (cleanText.length > 500 || cleanText.includes("We need to") || cleanText.includes("Let's write")) {
+        cleanText = "¡Juego generado! Aquí tienes el código.";
+      }
+    } else {
+       // If no code found, but text looks like reasoning
+       if (cleanText.includes("<!DOCTYPE html>") && cleanText.length < 2000) {
+           // Maybe the regex failed but the code is there?
+           // (Already handled by fallback above, but just in case)
+       } else if (cleanText.includes("We need to generate")) {
+           cleanText += "\n\n(Error: La IA pensó la solución pero no escribió el código final. Inténtalo de nuevo.)";
+       }
     }
 
     return {
@@ -133,6 +112,6 @@ export const sendMessageToPollinations = async (message: string, previousMessage
 
   } catch (error: any) {
     console.error("Pollinations API Error:", error);
-    throw new Error("Error conectando con Pollinations. Inténtalo de nuevo.");
+    throw new Error("Error conectando con la IA Gratuita. Intenta con Gemini o prueba de nuevo.");
   }
 };

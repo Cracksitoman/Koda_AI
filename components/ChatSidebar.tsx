@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Message, ChatSession, AIModel } from '../types';
-import { SendIcon, SparklesIcon, MenuIcon, PlusIcon, XIcon, TrashIcon, ChatIcon, ClockIcon, DownloadIcon, ChevronDownIcon } from './Icons';
+import { SendIcon, SparklesIcon, MenuIcon, PlusIcon, XIcon, TrashIcon, ChatIcon, ClockIcon, DownloadIcon, ChevronDownIcon, RefreshIcon } from './Icons';
 
 interface ChatSidebarProps {
   messages: Message[];
@@ -17,6 +17,7 @@ interface ChatSidebarProps {
   onExport: () => void;
   onSelectSession: (session: ChatSession) => void;
   onDeleteSession: (id: string) => void;
+  onResetAll: () => void; // New Prop
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ 
@@ -33,7 +34,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   onNewChat,
   onExport,
   onSelectSession,
-  onDeleteSession
+  onDeleteSession,
+  onResetAll
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -122,7 +124,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         </div>
       </div>
 
-      {/* Model Selector Bar (New) */}
+      {/* Model Selector Bar */}
       {!showHistory && (
         <div className="px-4 py-2 border-b border-secondary bg-black/20 flex items-center justify-between">
            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">Modelo IA</span>
@@ -221,32 +223,24 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             {isLoading && (
               <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="bg-zinc-800/50 border border-zinc-700/50 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-4">
-                  
-                  {/* Bouncing Dots */}
                   <div className="flex gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
                     <span className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
                     <span className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
                   </div>
-
-                  {/* Timer Divider */}
                   <div className="h-4 w-px bg-zinc-700"></div>
-
-                  {/* Timer Display */}
                   <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
                      <ClockIcon />
                      <span className="min-w-[4ch] font-medium text-zinc-300">
                         {elapsedTime.toFixed(1)}s
                      </span>
                   </div>
-
                 </div>
               </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="p-3 border-t border-secondary bg-background/50 backdrop-blur-sm z-10">
             <div className="relative">
               <textarea
@@ -275,8 +269,21 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           }`}
         >
           <div className="p-4 space-y-2">
+            
+            {/* Reset Button */}
+            <button 
+              onClick={() => {
+                if(window.confirm("¿Estás seguro? Se borrarán TODOS tus juegos y chats.")) {
+                   onResetAll();
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 p-3 rounded-lg border border-red-900/50 bg-red-900/10 text-red-400 hover:bg-red-900/30 transition-colors mb-4 text-sm font-medium"
+            >
+               <RefreshIcon /> Reset Total (Arreglar App)
+            </button>
+
             {sessions.length === 0 ? (
-               <div className="text-center text-zinc-500 mt-10">
+               <div className="text-center text-zinc-500 mt-4">
                  <p>No tienes proyectos guardados.</p>
                </div>
             ) : (
