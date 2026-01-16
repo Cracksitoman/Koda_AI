@@ -9,12 +9,14 @@ RULES:
 3. INCLUDE CSS in <style> and JS in <script>.
 4. MUST support TOUCH (touchstart) for mobile.
 5. Use <canvas> for graphics.
+6. If code is provided, UPDATE it based on the user request.
 `;
 
 export const sendMessageToPollinations = async (
   message: string, 
   previousMessages: Message[] = [], 
-  model: 'pollinations' | 'mistral' = 'pollinations'
+  model: 'pollinations' | 'mistral' = 'pollinations',
+  currentCode: string | null = null
 ): Promise<{ text: string; code: string | null }> => {
   try {
     // Construct messages
@@ -23,9 +25,20 @@ export const sendMessageToPollinations = async (
       ...previousMessages.map(msg => ({
         role: msg.role === 'model' ? 'assistant' : 'user', 
         content: msg.text
-      })),
-      { role: 'user', content: `Create code for: ${message}` }
+      }))
     ];
+
+    // INJECT CODE CONTEXT:
+    // If we have existing code, we send it along with the new user request.
+    // This ensures the AI edits the existing file instead of creating a new one.
+    let userPrompt = message;
+    if (currentCode) {
+        userPrompt = `Here is the current existing code:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nUSER REQUEST: ${message}\n\nTask: Return the fully updated code.`;
+    } else {
+        userPrompt = `Create code for: ${message}`;
+    }
+
+    messages.push({ role: 'user', content: userPrompt });
 
     // Map internal model name to Pollinations API model string
     // 'pollinations' maps to 'openai' (default generic)
@@ -87,7 +100,7 @@ export const sendMessageToPollinations = async (
     }
 
     if (!cleanText.trim()) {
-      cleanText = "¡Juego listo!";
+      cleanText = "¡Juego actualizado!";
     }
 
     return {

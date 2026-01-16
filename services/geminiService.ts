@@ -22,7 +22,8 @@ RULES:
    - **NO EXTERNAL ASSETS**: Use drawing commands (fillRect, arc) or placeholder images only.
 
 3. ITERATION:
-   - If the user asks to modify the game, rewrite the ENTIRE html file with changes.
+   - If code is provided in the prompt, you MUST output the FULL UPDATED CODE, not just snippets.
+   - Rewrite the ENTIRE html file with changes.
 
 4. LANGUAGE:
    - Reply in the user's language (Spanish/English), but keep code variables in English.
@@ -72,7 +73,11 @@ const convertHistoryToGemini = (messages: Message[]): Content[] => {
   }));
 };
 
-export const sendMessageToGemini = async (message: string, previousMessages: Message[] = []): Promise<{ text: string; code: string | null }> => {
+export const sendMessageToGemini = async (
+    message: string, 
+    previousMessages: Message[] = [],
+    currentCode: string | null = null
+): Promise<{ text: string; code: string | null }> => {
   if (!genAI) {
     initializeGenAI();
   }
@@ -99,10 +104,16 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
     let result;
     let lastError;
     const MAX_RETRIES = 3;
+    
+    // Inject code context if available
+    let promptToSend = message;
+    if (currentCode) {
+        promptToSend = `Here is the current game code:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nUser Instruction: ${message}\n\nPlease update the code accordingly and return the full file.`;
+    }
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        result = await chatSession.sendMessage({ message });
+        result = await chatSession.sendMessage({ message: promptToSend });
         break; // Success! Exit loop
       } catch (error: any) {
         lastError = error;
@@ -146,7 +157,7 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
     }
 
     if (!cleanText && extractedCode) {
-      cleanText = "¡Juego generado! Toca la pantalla para jugar.";
+      cleanText = "¡Juego actualizado! Toca para jugar.";
     }
 
     return {
@@ -157,7 +168,6 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   } catch (error: any) {
     console.error("Gemini API Error after retries:", error);
     
-    // Extract a more meaningful error message for the user
     let errorMessage = "Error desconocido al conectar con la IA.";
     
     if (error.message) {

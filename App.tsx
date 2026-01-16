@@ -127,10 +127,11 @@ const App: React.FC = () => {
       let response;
       // Switch service based on selected model
       if (currentModel === 'gemini') {
-         response = await sendMessageToGemini(userMessage.text, messages);
+         // Pass current code (if any) to Gemini so it can edit it
+         response = await sendMessageToGemini(userMessage.text, messages, gameState.code);
       } else {
-         // Pass the specific model ('pollinations' or 'mistral') to the service
-         response = await sendMessageToPollinations(userMessage.text, messages, currentModel);
+         // Pass current code (if any) to Pollinations/Mistral so it can edit it
+         response = await sendMessageToPollinations(userMessage.text, messages, currentModel, gameState.code);
       }
       
       const aiMessage: Message = {
