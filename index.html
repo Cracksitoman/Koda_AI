@@ -43,6 +43,18 @@
         background: #52525b; 
       }
     </style>
+    <!-- 
+      CORRECCIÓN CRÍTICA:
+      Definimos window.process para que el navegador no falle al buscar la API KEY.
+      Esto soluciona el problema de la pantalla en blanco.
+    -->
+    <script>
+      window.process = {
+        env: {
+          API_KEY: "AIzaSyDR8RlVcT-rgAq9o_H6uBAV8BHszhROC20" 
+        }
+      };
+    </script>
   <script type="importmap">
 {
   "imports": {
