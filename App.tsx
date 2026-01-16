@@ -165,16 +165,19 @@ const App: React.FC = () => {
         setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error.message || "Error desconocido";
+      
       setGameState((prev) => ({ 
         ...prev, 
         isLoading: false, 
-        error: "Failed to generate response." 
+        error: errorMessage 
       }));
+      
       setMessages((prev) => [...prev, {
         role: 'model',
-        text: "Hubo un error al generar el juego. Por favor intenta de nuevo.",
+        text: `⚠️ ${errorMessage}`,
         timestamp: Date.now()
       }]);
     }

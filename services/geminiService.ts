@@ -28,16 +28,23 @@ RULES:
    - Reply in the user's language (Spanish/English), but keep code variables in English.
 `;
 
+// Direct fallback key provided by user to ensure it works on Netlify/Deployments
+const DIRECT_API_KEY = "AIzaSyDR8RlVcT-rgAq9o_H6uBAV8BHszhROC20";
+
 let chatSession: Chat | null = null;
 let genAI: GoogleGenAI | null = null;
 
-// Helper to safely get API Key from window shim or process.env
+// Helper to safely get API Key
 const getApiKey = (): string | undefined => {
-  // Check the window shim first (injected in index.html)
+  // 1. Try Direct Hardcoded Key (Most reliable for this demo)
+  if (DIRECT_API_KEY) return DIRECT_API_KEY;
+
+  // 2. Check the window shim (injected in index.html)
   if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
     return (window as any).process.env.API_KEY;
   }
-  // Fallback to standard process.env (handled by bundlers)
+  
+  // 3. Fallback to standard process.env
   try {
     return process.env.API_KEY;
   } catch (e) {
@@ -48,7 +55,7 @@ const getApiKey = (): string | undefined => {
 export const initializeGenAI = () => {
   const key = getApiKey();
   if (!key) {
-    console.error("API_KEY is missing. Please ensure it is set in index.html or environment variables.");
+    console.error("API_KEY is missing.");
     return;
   }
   genAI = new GoogleGenAI({ apiKey: key });
@@ -68,15 +75,14 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   }
 
   if (!genAI) {
-    throw new Error("Failed to initialize Gemini Client: API Key missing.");
+    throw new Error("Clave API no encontrada. Verifica la configuración.");
   }
 
-  // Initialize chat session if it doesn't exist OR if we need to restore context from a different session
-  // We check if the session is synchronized by basic length check, if not, we rebuild it.
+  // Initialize chat session if needed
   if (!chatSession) {
     const history = convertHistoryToGemini(previousMessages);
     chatSession = genAI.chats.create({
-      model: 'gemini-2.0-flash-exp', // Updated to a currently available, high-performance model
+      model: 'gemini-2.0-flash-exp',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.4, 
@@ -118,9 +124,21 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
       code: extractedCode
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    throw error;
+    
+    // Extract a more meaningful error message for the user
+    let errorMessage = "Error desconocido al conectar con la IA.";
+    
+    if (error.message) {
+        if (error.message.includes("403")) errorMessage = "Error 403: Clave API inválida o expirada.";
+        else if (error.message.includes("404")) errorMessage = "Error 404: El modelo de IA no está disponible actualmente.";
+        else if (error.message.includes("429")) errorMessage = "Error 429: Demasiadas peticiones. Espera un momento.";
+        else if (error.message.includes("503")) errorMessage = "Error 503: Servicio de IA sobrecargado.";
+        else errorMessage = `Error de API: ${error.message}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 };
 
