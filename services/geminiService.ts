@@ -34,6 +34,9 @@ const DIRECT_API_KEY = "AIzaSyDR8RlVcT-rgAq9o_H6uBAV8BHszhROC20";
 let chatSession: Chat | null = null;
 let genAI: GoogleGenAI | null = null;
 
+// Helper function to delay execution (used for retries)
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Helper to safely get API Key
 const getApiKey = (): string | undefined => {
   // 1. Try Direct Hardcoded Key (Most reliable for this demo)
@@ -82,7 +85,7 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   if (!chatSession) {
     const history = convertHistoryToGemini(previousMessages);
     chatSession = genAI.chats.create({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.0-flash-exp', // Keeping the fast experimental model
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.4, 
@@ -92,7 +95,34 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   }
 
   try {
-    const result = await chatSession.sendMessage({ message });
+    // RETRY LOGIC: Attempt to send message up to 3 times if we hit a rate limit (429)
+    let result;
+    let lastError;
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        result = await chatSession.sendMessage({ message });
+        break; // Success! Exit loop
+      } catch (error: any) {
+        lastError = error;
+        // Check if error is 429 (Too Many Requests) or 503 (Service Unavailable)
+        const isRateLimit = error.message?.includes("429") || error.message?.includes("503");
+        
+        if (isRateLimit && attempt < MAX_RETRIES) {
+          console.warn(`Hit rate limit (429/503). Retrying in ${2 * (attempt + 1)} seconds...`);
+          // Exponential backoff: Wait 2s, 4s, 6s...
+          await delay(2000 * (attempt + 1)); 
+          continue;
+        }
+        
+        // If it's not a rate limit error, or we ran out of retries, throw immediately
+        throw error;
+      }
+    }
+
+    if (!result) throw lastError;
+
     const responseText = result.text || "";
     
     let extractedCode = null;
@@ -125,7 +155,7 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
     };
 
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error after retries:", error);
     
     // Extract a more meaningful error message for the user
     let errorMessage = "Error desconocido al conectar con la IA.";
@@ -133,8 +163,8 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
     if (error.message) {
         if (error.message.includes("403")) errorMessage = "Error 403: Clave API inválida o expirada.";
         else if (error.message.includes("404")) errorMessage = "Error 404: El modelo de IA no está disponible actualmente.";
-        else if (error.message.includes("429")) errorMessage = "Error 429: Demasiadas peticiones. Espera un momento.";
-        else if (error.message.includes("503")) errorMessage = "Error 503: Servicio de IA sobrecargado.";
+        else if (error.message.includes("429")) errorMessage = "Error 429: Tráfico alto en la IA. Inténtalo de nuevo en unos segundos.";
+        else if (error.message.includes("503")) errorMessage = "Error 503: Servicio de IA sobrecargado temporalmente.";
         else errorMessage = `Error de API: ${error.message}`;
     }
     
