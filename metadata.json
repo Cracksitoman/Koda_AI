@@ -1,0 +1,5 @@
+{
+  "name": "GamboClone",
+  "description": "A text-to-game generator powered by Gemini. Create playable HTML5 games using natural language prompts.",
+  "requestFramePermissions": []
+}
