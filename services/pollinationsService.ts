@@ -9,6 +9,7 @@ RULES:
    - You must provide a short conversational response.
    - You MUST include the full HTML code inside a Markdown code block (e.g., \`\`\`html ... \`\`\`).
    - The code must start with \`<!DOCTYPE html>\`.
+   - IMPORTANT: Return the raw text response. Do not wrap it in a JSON object.
 
 2. GAME CODE REQUIREMENTS:
    - **SINGLE FILE**: HTML + CSS (in <style>) + JS (in <script>).
@@ -33,7 +34,7 @@ export const sendMessageToPollinations = async (message: string, previousMessage
     const messages = [
       { role: 'system', content: SYSTEM_INSTRUCTION },
       ...previousMessages.map(msg => ({
-        role: msg.role === 'model' ? 'assistant' : 'user', // Pollinations uses 'assistant' instead of 'model'
+        role: msg.role === 'model' ? 'assistant' : 'user', 
         content: msg.text
       })),
       { role: 'user', content: message }
@@ -46,7 +47,7 @@ export const sendMessageToPollinations = async (message: string, previousMessage
       },
       body: JSON.stringify({
         messages: messages,
-        model: 'openai', // Maps to GPT-4o-mini or similar lightweight models
+        model: 'openai', // Maps to GPT-4o-mini or similar
         seed: Math.floor(Math.random() * 1000),
         jsonMode: false
       }),
@@ -56,9 +57,40 @@ export const sendMessageToPollinations = async (message: string, previousMessage
       throw new Error(`Pollinations Error: ${response.statusText}`);
     }
 
-    const responseText = await response.text();
+    let responseText = await response.text();
 
-    // --- Code Extraction Logic (Same as Gemini) ---
+    // --- JSON PARSING FIX ---
+    // Sometimes Pollinations (or the underlying model like DeepSeek) returns a JSON object
+    // instead of raw text. We need to unwrap it.
+    try {
+      const trimmed = responseText.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        const json = JSON.parse(trimmed);
+        
+        // Priority 1: Standard 'content' field
+        if (json.content) {
+          responseText = json.content;
+        } 
+        // Priority 2: OpenAI 'choices' format
+        else if (json.choices?.[0]?.message?.content) {
+          responseText = json.choices[0].message.content;
+        }
+        // Priority 3: DeepSeek 'reasoning_content' without content (Edge case)
+        // If we only have reasoning, the model failed to produce the final output.
+        else if (json.reasoning_content) {
+             console.warn("Pollinations returned reasoning but no content.");
+             // Fallback: If the code happened to be in the reasoning (unlikely but possible)
+             responseText = json.reasoning_content; 
+        }
+      }
+    } catch (e) {
+      // Not JSON, ignore and use raw text
+    }
+
+    // Remove <think> tags if present (DeepSeek artifacts)
+    responseText = responseText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // --- Code Extraction Logic ---
     let extractedCode = null;
     let cleanText = responseText;
 
@@ -83,6 +115,17 @@ export const sendMessageToPollinations = async (message: string, previousMessage
       cleanText = "¡Juego generado con Pollinations! Toca para jugar.";
     }
 
+    // Final fallback if extraction failed but we suspect code is there
+    if (!extractedCode && responseText.includes("<!DOCTYPE html>")) {
+        // Try one more aggressive grab
+        const startIndex = responseText.indexOf("<!DOCTYPE html>");
+        const endIndex = responseText.lastIndexOf("</html>");
+        if (endIndex > startIndex) {
+            extractedCode = responseText.substring(startIndex, endIndex + 7);
+            cleanText = "Código extraído manualmente.";
+        }
+    }
+
     return {
       text: cleanText,
       code: extractedCode
@@ -90,6 +133,6 @@ export const sendMessageToPollinations = async (message: string, previousMessage
 
   } catch (error: any) {
     console.error("Pollinations API Error:", error);
-    throw new Error("Error conectando con Pollinations (Free AI). Inténtalo de nuevo.");
+    throw new Error("Error conectando con Pollinations. Inténtalo de nuevo.");
   }
 };
