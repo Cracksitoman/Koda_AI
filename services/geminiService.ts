@@ -31,12 +31,27 @@ RULES:
 let chatSession: Chat | null = null;
 let genAI: GoogleGenAI | null = null;
 
+// Helper to safely get API Key from window shim or process.env
+const getApiKey = (): string | undefined => {
+  // Check the window shim first (injected in index.html)
+  if (typeof window !== 'undefined' && (window as any).process?.env?.API_KEY) {
+    return (window as any).process.env.API_KEY;
+  }
+  // Fallback to standard process.env (handled by bundlers)
+  try {
+    return process.env.API_KEY;
+  } catch (e) {
+    return undefined;
+  }
+};
+
 export const initializeGenAI = () => {
-  if (!process.env.API_KEY) {
-    console.error("API_KEY is missing");
+  const key = getApiKey();
+  if (!key) {
+    console.error("API_KEY is missing. Please ensure it is set in index.html or environment variables.");
     return;
   }
-  genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  genAI = new GoogleGenAI({ apiKey: key });
 };
 
 // Convert app Message format to Gemini Content format
@@ -53,7 +68,7 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   }
 
   if (!genAI) {
-    throw new Error("Failed to initialize Gemini Client");
+    throw new Error("Failed to initialize Gemini Client: API Key missing.");
   }
 
   // Initialize chat session if it doesn't exist OR if we need to restore context from a different session
@@ -61,7 +76,7 @@ export const sendMessageToGemini = async (message: string, previousMessages: Mes
   if (!chatSession) {
     const history = convertHistoryToGemini(previousMessages);
     chatSession = genAI.chats.create({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-2.0-flash-exp', // Updated to a currently available, high-performance model
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.4, 
