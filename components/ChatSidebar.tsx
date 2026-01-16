@@ -17,7 +17,7 @@ interface ChatSidebarProps {
   onExport: () => void;
   onSelectSession: (session: ChatSession) => void;
   onDeleteSession: (id: string) => void;
-  onResetAll: () => void; // New Prop
+  onResetAll: () => void;
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ 
@@ -40,8 +40,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showModelMenu, setShowModelMenu] = useState(false);
-  
-  // Timer state
   const [elapsedTime, setElapsedTime] = useState<number>(0);
 
   const scrollToBottom = () => {
@@ -54,7 +52,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     }
   }, [messages, isLoading, showHistory]);
 
-  // Timer Logic
   useEffect(() => {
     let interval: any;
     if (isLoading) {
@@ -62,7 +59,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       const startTime = Date.now();
       interval = setInterval(() => {
         setElapsedTime((Date.now() - startTime) / 1000);
-      }, 100); // Update every 100ms
+      }, 100);
     } else {
       setElapsedTime(0);
     }
@@ -80,6 +77,19 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     return new Date(timestamp).toLocaleDateString(undefined, {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
+  };
+
+  const getModelName = (m: AIModel) => {
+    if (m === 'gemini') return 'Gemini';
+    if (m === 'pollinations') return 'Pollinations (GPT)';
+    if (m === 'mistral') return 'Mistral';
+    return m;
+  };
+
+  const getModelIcon = (m: AIModel) => {
+     if (m === 'gemini') return <span className="text-blue-400">★</span>;
+     if (m === 'mistral') return <span className="text-orange-400">⚡</span>;
+     return <span className="text-pink-400">∞</span>;
   };
 
   return (
@@ -133,11 +143,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 className="flex items-center gap-2 text-xs font-medium text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded transition-colors border border-zinc-700"
              >
-                {currentModel === 'gemini' ? (
-                   <><span className="text-blue-400">★</span> Gemini (Google)</>
-                ) : (
-                   <><span className="text-pink-400">∞</span> Pollinations (Free)</>
-                )}
+                {getModelIcon(currentModel)}
+                {getModelName(currentModel)}
                 <ChevronDownIcon />
              </button>
              
@@ -145,6 +152,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowModelMenu(false)}></div>
                 <div className="absolute top-full right-0 mt-2 w-48 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl z-40 overflow-hidden">
+                   {/* Gemini */}
                    <button 
                       onClick={() => { onModelChange('gemini'); setShowModelMenu(false); }}
                       className={`w-full text-left px-4 py-3 text-xs flex items-center gap-2 hover:bg-zinc-700 ${currentModel === 'gemini' ? 'bg-zinc-700/50 text-white' : 'text-zinc-400'}`}
@@ -152,10 +160,25 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       <span className="text-blue-400 text-sm">★</span>
                       <div>
                          <div className="font-bold">Gemini 2.0</div>
-                         <div className="text-[10px] opacity-70">Más inteligente, con espera.</div>
+                         <div className="text-[10px] opacity-70">Recomendado. Alta calidad.</div>
                       </div>
                    </button>
                    <div className="h-px bg-zinc-700 w-full"></div>
+                   
+                   {/* Mistral */}
+                   <button 
+                      onClick={() => { onModelChange('mistral'); setShowModelMenu(false); }}
+                      className={`w-full text-left px-4 py-3 text-xs flex items-center gap-2 hover:bg-zinc-700 ${currentModel === 'mistral' ? 'bg-zinc-700/50 text-white' : 'text-zinc-400'}`}
+                   >
+                      <span className="text-orange-400 text-sm">⚡</span>
+                      <div>
+                         <div className="font-bold">Mistral</div>
+                         <div className="text-[10px] opacity-70">Rápido. Directo.</div>
+                      </div>
+                   </button>
+                   <div className="h-px bg-zinc-700 w-full"></div>
+
+                   {/* Pollinations (GPT) */}
                    <button 
                       onClick={() => { onModelChange('pollinations'); setShowModelMenu(false); }}
                       className={`w-full text-left px-4 py-3 text-xs flex items-center gap-2 hover:bg-zinc-700 ${currentModel === 'pollinations' ? 'bg-zinc-700/50 text-white' : 'text-zinc-400'}`}
@@ -163,7 +186,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                       <span className="text-pink-400 text-sm">∞</span>
                       <div>
                          <div className="font-bold">Pollinations</div>
-                         <div className="text-[10px] opacity-70">Sin límites, ilimitado.</div>
+                         <div className="text-[10px] opacity-70">GPT-4o-Mini (A veces inestable).</div>
                       </div>
                    </button>
                 </div>
@@ -186,15 +209,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             {messages.length === 0 && (
               <div className="text-zinc-500 text-center mt-6 text-sm flex flex-col items-center">
                  <div className="bg-zinc-800 p-4 rounded-full mb-4">
-                    {currentModel === 'gemini' ? <SparklesIcon /> : <span className="text-2xl">∞</span>}
+                    {getModelIcon(currentModel)}
                  </div>
                 <p className="mb-2 font-medium text-zinc-300">
-                  {currentModel === 'gemini' ? 'Modo: Gemini Flash' : 'Modo: Pollinations (Gratis)'}
-                </p>
-                <p className="text-xs max-w-[200px] mb-4">
-                  {currentModel === 'gemini' 
-                    ? 'Alta calidad, pero puede tener tiempos de espera (Error 429).' 
-                    : 'Calidad estándar, sin colas de espera ni límites.'}
+                  Modo: {getModelName(currentModel)}
                 </p>
                 <div className="grid grid-cols-1 gap-2 w-full max-w-[250px]">
                    <button onClick={() => onInputChange("Juego de naves espaciales retro")} className="bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700 p-2 rounded text-xs transition-colors">"Juego de naves retro"</button>
@@ -224,9 +242,9 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="bg-zinc-800/50 border border-zinc-700/50 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-4">
                   <div className="flex gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full animate-bounce ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
-                    <span className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
-                    <span className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${currentModel === 'gemini' ? 'bg-blue-400' : 'bg-pink-400'}`}></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-100"></span>
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-200"></span>
                   </div>
                   <div className="h-4 w-px bg-zinc-700"></div>
                   <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
@@ -247,7 +265,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 value={input}
                 onChange={(e) => onInputChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Describe tu juego (${currentModel === 'gemini' ? 'Gemini' : 'Pollinations'})...`}
+                placeholder={`Describe tu juego...`}
                 className="w-full bg-secondary text-white rounded-xl pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none h-[52px] md:h-[60px] max-h-[120px] overflow-hidden text-sm"
                 disabled={isLoading}
               />
@@ -269,8 +287,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           }`}
         >
           <div className="p-4 space-y-2">
-            
-            {/* Reset Button */}
             <button 
               onClick={() => {
                 if(window.confirm("¿Estás seguro? Se borrarán TODOS tus juegos y chats.")) {
@@ -279,15 +295,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               }}
               className="w-full flex items-center justify-center gap-2 p-3 rounded-lg border border-red-900/50 bg-red-900/10 text-red-400 hover:bg-red-900/30 transition-colors mb-4 text-sm font-medium"
             >
-               <RefreshIcon /> Reset Total (Arreglar App)
+               <RefreshIcon /> Reset Total
             </button>
 
-            {sessions.length === 0 ? (
-               <div className="text-center text-zinc-500 mt-4">
-                 <p>No tienes proyectos guardados.</p>
-               </div>
-            ) : (
-              sessions.map((session) => (
+            {sessions.map((session) => (
                 <div 
                   key={session.id}
                   onClick={() => {
@@ -309,11 +320,10 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         {session.name}
                       </span>
                       <span className="text-xs text-zinc-500 truncate">
-                        {formatDate(session.lastModified)} • {session.model === 'pollinations' ? '∞ Pollinations' : '★ Gemini'}
+                        {formatDate(session.lastModified)} • {getModelName(session.model || 'gemini')}
                       </span>
                     </div>
                   </div>
-                  
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -324,8 +334,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     <TrashIcon />
                   </button>
                 </div>
-              ))
-            )}
+            ))}
           </div>
         </div>
 

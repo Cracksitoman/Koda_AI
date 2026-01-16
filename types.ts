@@ -17,7 +17,7 @@ export enum ViewMode {
   CODE = 'CODE'
 }
 
-export type AIModel = 'gemini' | 'pollinations';
+export type AIModel = 'gemini' | 'pollinations' | 'mistral';
 
 export interface ChatSession {
   id: string;

@@ -55,7 +55,7 @@ const App: React.FC = () => {
   const loadSession = useCallback((session: ChatSession) => {
     setCurrentSessionId(session.id);
     setMessages(session.messages);
-    setCurrentModel(session.model || 'gemini'); // Restore model choice if saved
+    setCurrentModel(session.model || 'gemini');
     
     // Safety check: ensure code is actually HTML before loading it
     const validCode = (session.code && session.code.includes("<!DOCTYPE html>")) ? session.code : null;
@@ -83,7 +83,6 @@ const App: React.FC = () => {
     const updatedSessions = sessions.filter(s => s.id !== id);
     setSessions(updatedSessions);
 
-    // If we deleted the active session, switch to another or create new
     if (id === currentSessionId) {
       if (updatedSessions.length > 0) {
         loadSession(updatedSessions[0]);
@@ -101,7 +100,6 @@ const App: React.FC = () => {
     
     setIsExporting(true);
     try {
-      // Export as a single HTML file now
       exportGameAsHtml(gameState.code, projectName);
     } catch (e) {
       console.error("Export failed", e);
@@ -126,13 +124,13 @@ const App: React.FC = () => {
     setGameState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // Logic to switch between services
       let response;
-      if (currentModel === 'pollinations') {
-        response = await sendMessageToPollinations(userMessage.text, messages);
+      // Switch service based on selected model
+      if (currentModel === 'gemini') {
+         response = await sendMessageToGemini(userMessage.text, messages);
       } else {
-        // Default to Gemini
-        response = await sendMessageToGemini(userMessage.text, messages);
+         // Pass the specific model ('pollinations' or 'mistral') to the service
+         response = await sendMessageToPollinations(userMessage.text, messages, currentModel);
       }
       
       const aiMessage: Message = {
@@ -180,7 +178,7 @@ const App: React.FC = () => {
           code: newCode,
           version: newVersion,
           lastModified: Date.now(),
-          model: currentModel // Save which model was used
+          model: currentModel
         };
 
         saveSession(updatedSession);
@@ -238,8 +236,8 @@ const App: React.FC = () => {
                {gameState.code ? `Version ${gameState.version}` : 'Nuevo Proyecto'}
              </span>
              {gameState.isLoading && (
-               <span className={`text-xs animate-pulse ml-2 ${currentModel === 'gemini' ? 'text-blue-400' : 'text-pink-400'}`}>
-                 {currentModel === 'gemini' ? 'Gemini programando...' : 'Pollinations programando...'}
+               <span className={`text-xs animate-pulse ml-2 ${currentModel === 'gemini' ? 'text-blue-400' : 'text-orange-400'}`}>
+                 {currentModel === 'gemini' ? 'Gemini programando...' : (currentModel === 'mistral' ? 'Mistral programando...' : 'Pollinations programando...')}
                </span>
              )}
           </div>
