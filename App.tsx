@@ -3,9 +3,10 @@ import ChatSidebar from './components/ChatSidebar';
 import GamePreview from './components/GamePreview';
 import CodeViewer from './components/CodeViewer';
 import { sendMessageToGemini, resetChat } from './services/geminiService';
+import { sendMessageToPollinations } from './services/pollinationsService';
 import { getSessions, saveSession, createSession, deleteSession } from './services/storageService';
 import { exportGameAsHtml } from './services/exportService';
-import { Message, GameState, ViewMode, ChatSession } from './types';
+import { Message, GameState, ViewMode, ChatSession, AIModel } from './types';
 import { PlayIcon, CodeIcon, ChatIcon, DownloadIcon } from './components/Icons';
 
 type MobileTab = 'chat' | 'play' | 'code';
@@ -14,6 +15,9 @@ const App: React.FC = () => {
   // Session State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  
+  // Model State
+  const [currentModel, setCurrentModel] = useState<AIModel>('gemini');
 
   // UI State
   const [messages, setMessages] = useState<Message[]>([]);
@@ -51,6 +55,7 @@ const App: React.FC = () => {
   const loadSession = useCallback((session: ChatSession) => {
     setCurrentSessionId(session.id);
     setMessages(session.messages);
+    setCurrentModel(session.model || 'gemini'); // Restore model choice if saved
     setGameState({
       code: session.code,
       version: session.version,
@@ -109,8 +114,14 @@ const App: React.FC = () => {
     setGameState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      // We pass the current message history to ensure context is maintained/restored
-      const response = await sendMessageToGemini(userMessage.text, messages);
+      // Logic to switch between services
+      let response;
+      if (currentModel === 'pollinations') {
+        response = await sendMessageToPollinations(userMessage.text, messages);
+      } else {
+        // Default to Gemini
+        response = await sendMessageToGemini(userMessage.text, messages);
+      }
       
       const aiMessage: Message = {
         role: 'model',
@@ -156,7 +167,8 @@ const App: React.FC = () => {
           messages: updatedMessages,
           code: newCode,
           version: newVersion,
-          lastModified: Date.now()
+          lastModified: Date.now(),
+          model: currentModel // Save which model was used
         };
 
         saveSession(updatedSession);
@@ -195,6 +207,8 @@ const App: React.FC = () => {
           sessions={sessions}
           currentSessionId={currentSessionId}
           hasCode={!!gameState.code}
+          currentModel={currentModel}
+          onModelChange={setCurrentModel}
           onInputChange={setInput}
           onSend={handleSend}
           onNewChat={createNewSession}
@@ -211,7 +225,9 @@ const App: React.FC = () => {
                {gameState.code ? `Version ${gameState.version}` : 'Nuevo Proyecto'}
              </span>
              {gameState.isLoading && (
-               <span className="text-xs text-primary animate-pulse ml-2">Programando...</span>
+               <span className={`text-xs animate-pulse ml-2 ${currentModel === 'gemini' ? 'text-blue-400' : 'text-pink-400'}`}>
+                 {currentModel === 'gemini' ? 'Gemini programando...' : 'Pollinations programando...'}
+               </span>
              )}
           </div>
           <div className="flex bg-secondary p-1 rounded-lg">
@@ -272,6 +288,8 @@ const App: React.FC = () => {
               sessions={sessions}
               currentSessionId={currentSessionId}
               hasCode={!!gameState.code}
+              currentModel={currentModel}
+              onModelChange={setCurrentModel}
               onInputChange={setInput}
               onSend={handleSend}
               onNewChat={createNewSession}

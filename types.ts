@@ -1,3 +1,4 @@
+
 export interface Message {
   role: 'user' | 'model';
   text: string;
@@ -16,6 +17,8 @@ export enum ViewMode {
   CODE = 'CODE'
 }
 
+export type AIModel = 'gemini' | 'pollinations';
+
 export interface ChatSession {
   id: string;
   name: string; // The title of the project (e.g., "Space Shooter")
@@ -23,4 +26,5 @@ export interface ChatSession {
   code: string | null;
   version: number;
   lastModified: number;
+  model?: AIModel; // Optional for backward compatibility
 }
